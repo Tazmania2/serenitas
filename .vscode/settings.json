@@ -1,0 +1,8 @@
+{
+    "xml.fileAssociations": [
+        {
+            "pattern": "**/source/**.ptx",
+            "systemId": "c:\\Users\\guard\\.cursor\\extensions\\oscarlevin.pretext-tools-0.32.2-universal\\assets\\schema\\pretext.rng"
+        }
+    ]
+}
