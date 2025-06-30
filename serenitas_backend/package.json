@@ -3,18 +3,26 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["mental-health", "clinic", "api", "nodejs", "express"],
+  "author": "Serenitas Team",
   "license": "ISC",
-  "description": "",
+  "description": "Backend API for Serenitas mental health clinic app",
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.15.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }
