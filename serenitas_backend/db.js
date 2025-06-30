@@ -2,14 +2,19 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/serenitas';
+    console.log('Connecting to MongoDB...');
+    
+    await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('MongoDB connected');
+    console.log('MongoDB connected successfully');
   } catch (err) {
     console.error('MongoDB connection error:', err.message);
-    process.exit(1);
+    console.log('Please make sure MongoDB is running or check your MONGODB_URI in .env file');
+    // Don't exit process, let the app continue without database for now
+    console.log('Continuing without database connection...');
   }
 };
 
