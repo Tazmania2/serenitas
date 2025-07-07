@@ -1,0 +1,30 @@
+Just so you rememebr the project, some info:
+
+1 - React yes
+Yes, would love to use vercel actually
+2 - No preference on auth; 
+Ideally we would always encrypt patient data
+3 - Yes, mongodbatlas is fine
+yes, we are messsing with medical confidential data, brazilian laws apply
+4 - this design is an MVP alreayd, we will add more features in the future, right now we have login, after that for patient we have a dashboard with their prescriptions, their next appointment info , a quick access to the exams view and notifcation info; in the preccriptions screen we have the current prescriptions with a toggle (taken, not taken) that resets when it is time to take it again, the dcotor's  note on the prescription and a box so the user can inpput his own notes on the presscription. about prescription, the user should be able to set reminders for them, these are push notifications on the phone and the user should be able to click (taken) on them and already mark on the aapp that the medicine was taken. the exam view is siple, a list of the exams sent by the patient to the system (to the doctor) and a button to send new exams.
+The daily check in and humor board screens are a duo that work together, so the patient can input daily info for his doctor to receive, it also fetches info from fit aapps , watches and rings and etc.
+The doctor screens  are the dashboard, witha a list of patients, ordered by next visit time (closer first) and a patient details list, with aaall the info on the  patient and access to the paaatients inpouts in exaams, daily check in aand moodboard, this is whee the doctor caan innpupt, alter and delte prescriptions aand info on the prescriptions.
+The secretaary dashboaard is a just links to the other screens, the new consult screen where the secretary includes a new appointment, by inserting doctor, paatient, date and time (ideally this will be fetched from calendars/other apppointment apps like Amigo), the patient screen wheere the secretary haas the patient info (phone, address, helath plan and etc, no medical data) and doctor screen with the doctor info ( phone, available times, specialization etc.) - Also we need a secretary screen with a list of user where teh secretary can see all registered users and mark them as patiennts or doctors or secretaries., so ythe app defines the acces they have, when first registering, they get the patiennt view.
+
+5 - Yes we can begin with login
+I believe Iused material design by google
+
+1 - Yes they all login from the saame app, if that is the best/low cost option
+2 - YES LGPD and doctor patient data laws.
+All patient ifno should be encrypted.
+3 - what we have here is for the mvp
+4 - You should follow Figma as much as possible, I do know that the menu is not as consistent as it should be so you can fix it and we will fix any other errors if neede don the go
+We will have to create some screens through the proccess
+5 - Yes, integrate
+6 - push
+
+There's info on the figma prototype on  the figmatocursor file that helped you visualize
+
+the fimga file is - @https://www.figma.com/design/mC8Y8BLlOudvQm3D1chuRi/SGR?node-id=136-192&t=MQ9NvVHNNrXwwfnP-1 
+
+Keep to the project
