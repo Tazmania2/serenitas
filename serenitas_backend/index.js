@@ -32,7 +32,9 @@ app.use(express.urlencoded({ extended: true }));
 const PORT = process.env.PORT || 5000;
 
 // Connect to database
-connectDB();
+connectDB().then(() => {
+  console.log("Database connection has been attempted.");
+});
 
 // Health check endpoint
 app.get('/', (req, res) => {
