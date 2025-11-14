@@ -1,50 +1,114 @@
-const { body, validationResult } = require('express-validator');
+/**
+ * Input Validation Middleware
+ * 
+ * Express-validator based validation with Brazilian-specific validators.
+ * Returns validation errors in Portuguese.
+ * 
+ * Requirements: 12.4, 13.6, 13.10
+ */
 
-// Validation middleware
+const { body, param, query, validationResult } = require('express-validator');
+const { validateCPF, validatePhone, validatePassword } = require('../utils/validators');
+const { constants } = require('../config');
+const logger = require('../utils/logger');
+
+/**
+ * Handle validation errors
+ * Returns errors in Portuguese with consistent format
+ */
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
+  
   if (!errors.isEmpty()) {
+    const formattedErrors = errors.array().map(error => ({
+      campo: error.path,
+      mensagem: error.msg,
+      valor: error.value
+    }));
+
+    logger.warn('Validation errors', {
+      path: req.path,
+      method: req.method,
+      errors: formattedErrors,
+      userId: req.user?.id
+    });
+
     return res.status(400).json({
-      message: 'Validation error',
-      errors: errors.array().map(error => ({
-        field: error.path,
-        message: error.msg
-      }))
+      success: false,
+      message: 'Erro de validação',
+      errors: formattedErrors,
+      code: constants.ERROR_CODES.VALIDATION_REQUIRED_FIELD
     });
   }
+  
   next();
+};
+
+/**
+ * Custom validator for CPF
+ */
+const cpfValidator = (value) => {
+  if (!value) return true; // Optional field
+  if (!validateCPF(value)) {
+    throw new Error('CPF inválido');
+  }
+  return true;
+};
+
+/**
+ * Custom validator for phone
+ */
+const phoneValidator = (value) => {
+  if (!value) return true; // Optional field
+  if (!validatePhone(value)) {
+    throw new Error('Telefone inválido. Use o formato (XX) XXXXX-XXXX');
+  }
+  return true;
+};
+
+/**
+ * Custom validator for password strength
+ */
+const passwordValidator = (value) => {
+  const result = validatePassword(value);
+  if (!result.isValid) {
+    throw new Error(result.errors.join(', '));
+  }
+  return true;
 };
 
 // User registration validation
 const validateRegistration = [
   body('name')
     .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters')
+    .notEmpty()
+    .withMessage('Nome é obrigatório')
+    .isLength({ min: 2, max: 255 })
+    .withMessage('Nome deve ter entre 2 e 255 caracteres')
     .matches(/^[a-zA-ZÀ-ÿ\s]+$/)
-    .withMessage('Name can only contain letters and spaces'),
+    .withMessage('Nome deve conter apenas letras e espaços'),
   
   body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email é obrigatório')
     .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
+    .withMessage('Email inválido')
+    .normalizeEmail(),
   
   body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+    .notEmpty()
+    .withMessage('Senha é obrigatória')
+    .custom(passwordValidator),
+  
+  body('phone')
+    .optional()
+    .custom(phoneValidator),
   
   body('role')
-    .isIn(['patient', 'doctor', 'secretary'])
-    .withMessage('Role must be patient, doctor, or secretary'),
-  
-  body('cpf')
     .optional()
-    .isLength({ min: 11, max: 14 })
-    .withMessage('CPF must be between 11 and 14 characters')
-    .matches(/^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/)
-    .withMessage('Please provide a valid CPF format'),
+    .isIn(Object.values(constants.ROLES))
+    .withMessage(`Função deve ser: ${Object.values(constants.ROLES).join(', ')}`),
   
   handleValidationErrors
 ];
@@ -52,179 +116,290 @@ const validateRegistration = [
 // Login validation
 const validateLogin = [
   body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email é obrigatório')
     .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
+    .withMessage('Email inválido')
+    .normalizeEmail(),
   
   body('password')
     .notEmpty()
-    .withMessage('Password is required'),
+    .withMessage('Senha é obrigatória'),
   
   handleValidationErrors
 ];
 
 // Patient data validation
 const validatePatientData = [
-  body('name')
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters'),
-  
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
+  body('cpf')
+    .optional()
+    .custom(cpfValidator),
   
   body('phone')
     .optional()
-    .matches(/^\+?[\d\s\-\(\)]+$/)
-    .withMessage('Please provide a valid phone number'),
+    .custom(phoneValidator),
   
-  body('dateOfBirth')
+  body('date_of_birth')
     .optional()
     .isISO8601()
-    .withMessage('Please provide a valid date of birth'),
+    .withMessage('Data de nascimento inválida. Use formato ISO8601'),
   
-  body('address')
+  body('blood_type')
     .optional()
-    .isLength({ max: 200 })
-    .withMessage('Address must be less than 200 characters'),
+    .isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])
+    .withMessage('Tipo sanguíneo inválido'),
+  
+  body('height')
+    .optional()
+    .isFloat({ min: 0, max: 3 })
+    .withMessage('Altura deve ser um número entre 0 e 3 metros'),
+  
+  body('weight')
+    .optional()
+    .isFloat({ min: 0, max: 500 })
+    .withMessage('Peso deve ser um número entre 0 e 500 kg'),
+  
+  body('emergency_contact_phone')
+    .optional()
+    .custom(phoneValidator),
   
   handleValidationErrors
 ];
 
 // Appointment validation
 const validateAppointment = [
-  body('patientId')
-    .isMongoId()
-    .withMessage('Valid patient ID is required'),
+  body('patient_id')
+    .notEmpty()
+    .withMessage('ID do paciente é obrigatório')
+    .isUUID()
+    .withMessage('ID do paciente inválido'),
   
-  body('doctorId')
-    .isMongoId()
-    .withMessage('Valid doctor ID is required'),
+  body('doctor_id')
+    .notEmpty()
+    .withMessage('ID do médico é obrigatório')
+    .isUUID()
+    .withMessage('ID do médico inválido'),
   
-  body('date')
-    .isISO8601()
-    .withMessage('Please provide a valid appointment date'),
+  body('appointment_date')
+    .notEmpty()
+    .withMessage('Data da consulta é obrigatória')
+    .isDate()
+    .withMessage('Data da consulta inválida. Use formato YYYY-MM-DD'),
   
-  body('time')
+  body('appointment_time')
+    .notEmpty()
+    .withMessage('Horário da consulta é obrigatório')
     .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Please provide a valid time in HH:MM format'),
+    .withMessage('Horário inválido. Use formato HH:MM'),
   
   body('type')
-    .isIn(['consultation', 'follow-up', 'emergency', 'evaluation'])
-    .withMessage('Appointment type must be consultation, follow-up, emergency, or evaluation'),
+    .optional()
+    .isIn(constants.APPOINTMENT.TYPES)
+    .withMessage(`Tipo deve ser: ${constants.APPOINTMENT.TYPES.join(', ')}`),
+  
+  body('duration_minutes')
+    .optional()
+    .isInt({ min: 15, max: 240 })
+    .withMessage('Duração deve ser entre 15 e 240 minutos'),
   
   body('notes')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('Notes must be less than 500 characters'),
+    .isLength({ max: 1000 })
+    .withMessage('Notas devem ter no máximo 1000 caracteres'),
   
   handleValidationErrors
 ];
 
 // Prescription validation
 const validatePrescription = [
-  body('patientId')
-    .isMongoId()
-    .withMessage('Valid patient ID is required'),
+  body('patient_id')
+    .notEmpty()
+    .withMessage('ID do paciente é obrigatório')
+    .isUUID()
+    .withMessage('ID do paciente inválido'),
   
-  body('doctorId')
-    .isMongoId()
-    .withMessage('Valid doctor ID is required'),
+  body('doctor_id')
+    .notEmpty()
+    .withMessage('ID do médico é obrigatório')
+    .isUUID()
+    .withMessage('ID do médico inválido'),
   
-  body('medication')
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Medication name must be between 2 and 100 characters'),
-  
-  body('dosage')
-    .trim()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Dosage must be between 1 and 50 characters'),
+  body('duration_days')
+    .notEmpty()
+    .withMessage('Duração é obrigatória')
+    .isInt({ min: 1, max: constants.PRESCRIPTION.MAX_DURATION_DAYS })
+    .withMessage(`Duração deve ser entre 1 e ${constants.PRESCRIPTION.MAX_DURATION_DAYS} dias`),
   
   body('instructions')
-    .trim()
-    .isLength({ min: 5, max: 500 })
-    .withMessage('Instructions must be between 5 and 500 characters'),
-  
-  body('startDate')
-    .isISO8601()
-    .withMessage('Please provide a valid start date'),
-  
-  body('endDate')
     .optional()
-    .isISO8601()
-    .withMessage('Please provide a valid end date'),
+    .isLength({ max: 1000 })
+    .withMessage('Instruções devem ter no máximo 1000 caracteres'),
+  
+  body('medications')
+    .isArray({ min: 1 })
+    .withMessage('Pelo menos um medicamento é obrigatório'),
+  
+  body('medications.*.name')
+    .trim()
+    .notEmpty()
+    .withMessage('Nome do medicamento é obrigatório')
+    .isLength({ min: 2, max: 255 })
+    .withMessage('Nome do medicamento deve ter entre 2 e 255 caracteres'),
+  
+  body('medications.*.dosage')
+    .trim()
+    .notEmpty()
+    .withMessage('Dosagem é obrigatória')
+    .isLength({ max: 100 })
+    .withMessage('Dosagem deve ter no máximo 100 caracteres'),
+  
+  body('medications.*.frequency')
+    .trim()
+    .notEmpty()
+    .withMessage('Frequência é obrigatória')
+    .isLength({ max: 100 })
+    .withMessage('Frequência deve ter no máximo 100 caracteres'),
+  
+  body('medications.*.quantity')
+    .notEmpty()
+    .withMessage('Quantidade é obrigatória')
+    .isInt({ min: 1 })
+    .withMessage('Quantidade deve ser um número inteiro positivo'),
   
   handleValidationErrors
 ];
 
 // Exam validation
 const validateExam = [
-  body('patientId')
-    .isMongoId()
-    .withMessage('Valid patient ID is required'),
+  body('patient_id')
+    .notEmpty()
+    .withMessage('ID do paciente é obrigatório')
+    .isUUID()
+    .withMessage('ID do paciente inválido'),
   
-  body('doctorId')
-    .isMongoId()
-    .withMessage('Valid doctor ID is required'),
-  
-  body('type')
+  body('exam_type')
     .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Exam type must be between 2 and 100 characters'),
+    .notEmpty()
+    .withMessage('Tipo de exame é obrigatório')
+    .isLength({ min: 2, max: 255 })
+    .withMessage('Tipo de exame deve ter entre 2 e 255 caracteres'),
   
-  body('description')
+  body('exam_name')
+    .trim()
+    .notEmpty()
+    .withMessage('Nome do exame é obrigatório')
+    .isLength({ min: 2, max: 255 })
+    .withMessage('Nome do exame deve ter entre 2 e 255 caracteres'),
+  
+  body('exam_date')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('Description must be less than 500 characters'),
-  
-  body('date')
-    .isISO8601()
-    .withMessage('Please provide a valid exam date'),
+    .isDate()
+    .withMessage('Data do exame inválida. Use formato YYYY-MM-DD'),
   
   body('results')
     .optional()
+    .isLength({ max: 5000 })
+    .withMessage('Resultados devem ter no máximo 5000 caracteres'),
+  
+  body('notes')
+    .optional()
     .isLength({ max: 1000 })
-    .withMessage('Results must be less than 1000 characters'),
+    .withMessage('Notas devem ter no máximo 1000 caracteres'),
   
   handleValidationErrors
 ];
 
 // Mood entry validation
 const validateMoodEntry = [
-  body('patientId')
-    .isMongoId()
-    .withMessage('Valid patient ID is required'),
+  body('patient_id')
+    .notEmpty()
+    .withMessage('ID do paciente é obrigatório')
+    .isUUID()
+    .withMessage('ID do paciente inválido'),
   
-  body('mood')
-    .isInt({ min: 1, max: 10 })
-    .withMessage('Mood must be a number between 1 and 10'),
+  body('mood_level')
+    .notEmpty()
+    .withMessage('Nível de humor é obrigatório')
+    .isInt({ min: constants.MOOD.MIN_LEVEL, max: constants.MOOD.MAX_LEVEL })
+    .withMessage(`Nível de humor deve ser entre ${constants.MOOD.MIN_LEVEL} e ${constants.MOOD.MAX_LEVEL}`),
+  
+  body('stress_level')
+    .optional()
+    .isInt({ min: constants.MOOD.MIN_LEVEL, max: constants.MOOD.MAX_LEVEL })
+    .withMessage(`Nível de estresse deve ser entre ${constants.MOOD.MIN_LEVEL} e ${constants.MOOD.MAX_LEVEL}`),
+  
+  body('anxiety_level')
+    .optional()
+    .isInt({ min: constants.MOOD.MIN_LEVEL, max: constants.MOOD.MAX_LEVEL })
+    .withMessage(`Nível de ansiedade deve ser entre ${constants.MOOD.MIN_LEVEL} e ${constants.MOOD.MAX_LEVEL}`),
+  
+  body('depression_level')
+    .optional()
+    .isInt({ min: constants.MOOD.MIN_LEVEL, max: constants.MOOD.MAX_LEVEL })
+    .withMessage(`Nível de depressão deve ser entre ${constants.MOOD.MIN_LEVEL} e ${constants.MOOD.MAX_LEVEL}`),
+  
+  body('sleep_hours')
+    .optional()
+    .isFloat({ min: 0, max: 24 })
+    .withMessage('Horas de sono devem ser entre 0 e 24'),
+  
+  body('exercise_minutes')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Minutos de exercício devem ser um número positivo'),
+  
+  body('social_interaction')
+    .optional()
+    .isIn(constants.MOOD.SOCIAL_INTERACTION_LEVELS)
+    .withMessage(`Interação social deve ser: ${constants.MOOD.SOCIAL_INTERACTION_LEVELS.join(', ')}`),
   
   body('notes')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('Notes must be less than 500 characters'),
+    .isLength({ max: 1000 })
+    .withMessage('Notas devem ter no máximo 1000 caracteres'),
   
   body('activities')
     .optional()
     .isArray()
-    .withMessage('Activities must be an array'),
-  
-  body('activities.*')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Each activity must be less than 50 characters'),
+    .withMessage('Atividades devem ser um array'),
   
   handleValidationErrors
 ];
 
-// ID validation
-const validateId = [
-  body('id')
-    .isMongoId()
-    .withMessage('Valid ID is required'),
+// UUID parameter validation
+const validateUUID = [
+  param('id')
+    .isUUID()
+    .withMessage('ID inválido'),
+  
+  handleValidationErrors
+];
+
+// Password change validation
+const validatePasswordChange = [
+  body('oldPassword')
+    .notEmpty()
+    .withMessage('Senha atual é obrigatória'),
+  
+  body('newPassword')
+    .notEmpty()
+    .withMessage('Nova senha é obrigatória')
+    .custom(passwordValidator),
+  
+  handleValidationErrors
+];
+
+// Password reset validation
+const validatePasswordReset = [
+  body('resetToken')
+    .notEmpty()
+    .withMessage('Token de redefinição é obrigatório'),
+  
+  body('newPassword')
+    .notEmpty()
+    .withMessage('Nova senha é obrigatória')
+    .custom(passwordValidator),
   
   handleValidationErrors
 ];
@@ -237,6 +412,12 @@ module.exports = {
   validatePrescription,
   validateExam,
   validateMoodEntry,
-  validateId,
-  handleValidationErrors
+  validateUUID,
+  validatePasswordChange,
+  validatePasswordReset,
+  handleValidationErrors,
+  // Export custom validators for reuse
+  cpfValidator,
+  phoneValidator,
+  passwordValidator
 }; 

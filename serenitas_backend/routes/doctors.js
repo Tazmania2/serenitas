@@ -1,96 +1,195 @@
 const express = require('express');
-const Doctor = require('../models/Doctor');
-const Patient = require('../models/Patient');
 const auth = require('../middleware/auth');
+const requireRole = require('../middleware/rbac');
+const doctorService = require('../services/doctorService');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
-// Helper function to create wrapped response
-const createResponse = (success, data, message = '', error = null) => {
-  return {
-    success,
-    data,
-    message,
-    error
-  };
-};
-
-// Get all doctors
-router.get('/', auth, async (req, res) => {
+/**
+ * GET /api/doctors
+ * Get all doctors
+ * Access: All authenticated users
+ * Requirements: 5.1
+ */
+router.get('/', auth, async (req, res, next) => {
   try {
-    const doctors = await Doctor.find().populate('userId', 'name email phone');
-    res.json(createResponse(true, doctors, 'Doctors retrieved successfully'));
+    logger.info('GET /api/doctors', { userId: req.user.id, role: req.user.role });
+
+    const doctors = await doctorService.getAllDoctors();
+
+    res.json({
+      success: true,
+      data: doctors,
+      message: 'Médicos recuperados com sucesso'
+    });
   } catch (error) {
-    res.status(500).json(createResponse(false, null, 'Server error', error.message));
+    logger.error('Error in GET /api/doctors', { error: error.message });
+    next(error);
   }
 });
 
-// Get doctor by ID
-router.get('/:id', auth, async (req, res) => {
+/**
+ * GET /api/doctors/:id
+ * Get doctor by ID
+ * Access: All authenticated users
+ * Requirements: 5.1
+ */
+router.get('/:id', auth, async (req, res, next) => {
   try {
-    const doctor = await Doctor.findById(req.params.id).populate('userId', 'name email phone');
-    if (!doctor) {
-      return res.status(404).json(createResponse(false, null, 'Doctor not found', 'Doctor does not exist'));
+    const { id } = req.params;
+    logger.info('GET /api/doctors/:id', { doctorId: id, userId: req.user.id });
+
+    const doctor = await doctorService.getDoctorById(id);
+
+    res.json({
+      success: true,
+      data: doctor,
+      message: 'Médico recuperado com sucesso'
+    });
+  } catch (error) {
+    if (error.message === 'Médico não encontrado') {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: error.message,
+        error: error.message
+      });
     }
-    res.json(createResponse(true, doctor, 'Doctor retrieved successfully'));
-  } catch (error) {
-    res.status(500).json(createResponse(false, null, 'Server error', error.message));
+    logger.error('Error in GET /api/doctors/:id', { error: error.message });
+    next(error);
   }
 });
 
-// Get doctor's patients
-router.get('/:id/patients', auth, async (req, res) => {
+/**
+ * GET /api/doctors/:id/patients
+ * Get patients assigned to a doctor
+ * Access: Doctor (own patients), Admin
+ * Requirements: 5.2
+ */
+router.get('/:id/patients', auth, async (req, res, next) => {
   try {
-    const doctor = await Doctor.findById(req.params.id);
-    if (!doctor) {
-      return res.status(404).json(createResponse(false, null, 'Doctor not found', 'Doctor does not exist'));
+    const { id } = req.params;
+    const { user } = req;
+
+    logger.info('GET /api/doctors/:id/patients', { 
+      doctorId: id, 
+      userId: user.id, 
+      role: user.role 
+    });
+
+    // Authorization: Doctor can only view their own patients, admin can view any
+    if (user.role === 'doctor') {
+      // Get doctor record for this user
+      const { data: doctorRecord } = await require('../config/supabase')
+        .from('doctors')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!doctorRecord || doctorRecord.id !== id) {
+        return res.status(403).json({
+          success: false,
+          data: null,
+          message: 'Acesso negado',
+          error: 'Você só pode visualizar seus próprios pacientes'
+        });
+      }
+    } else if (user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        data: null,
+        message: 'Acesso negado',
+        error: 'Permissões insuficientes'
+      });
     }
-    
-    const patients = await Patient.find({ _id: { $in: doctor.patients } })
-      .populate('userId', 'name email phone');
-    res.json(createResponse(true, patients, 'Doctor patients retrieved successfully'));
-  } catch (error) {
-    res.status(500).json(createResponse(false, null, 'Server error', error.message));
-  }
-});
 
-// Create new doctor
-router.post('/', auth, async (req, res) => {
-  try {
-    const doctor = new Doctor(req.body);
-    const newDoctor = await doctor.save();
-    res.status(201).json(createResponse(true, newDoctor, 'Doctor created successfully'));
-  } catch (error) {
-    res.status(400).json(createResponse(false, null, 'Bad request', error.message));
-  }
-});
+    const patients = await doctorService.getAssignedPatients(id);
 
-// Update doctor
-router.put('/:id', auth, async (req, res) => {
-  try {
-    const doctor = await Doctor.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!doctor) {
-      return res.status(404).json(createResponse(false, null, 'Doctor not found', 'Doctor does not exist'));
+    res.json({
+      success: true,
+      data: patients,
+      message: 'Pacientes recuperados com sucesso'
+    });
+  } catch (error) {
+    if (error.message === 'Médico não encontrado') {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: error.message,
+        error: error.message
+      });
     }
-    res.json(createResponse(true, doctor, 'Doctor updated successfully'));
-  } catch (error) {
-    res.status(400).json(createResponse(false, null, 'Bad request', error.message));
+    logger.error('Error in GET /api/doctors/:id/patients', { error: error.message });
+    next(error);
   }
 });
 
-// Delete doctor
-router.delete('/:id', auth, async (req, res) => {
+/**
+ * PUT /api/doctors/:id
+ * Update doctor profile
+ * Access: Doctor (own profile), Admin
+ * Requirements: 5.2
+ */
+router.put('/:id', auth, async (req, res, next) => {
   try {
-    const doctor = await Doctor.findByIdAndDelete(req.params.id);
-    if (!doctor) {
-      return res.status(404).json(createResponse(false, null, 'Doctor not found', 'Doctor does not exist'));
+    const { id } = req.params;
+    const { user } = req;
+
+    logger.info('PUT /api/doctors/:id', { 
+      doctorId: id, 
+      userId: user.id, 
+      role: user.role 
+    });
+
+    // Authorization: Doctor can only update their own profile, admin can update any
+    if (user.role === 'doctor') {
+      const { data: doctorRecord } = await require('../config/supabase')
+        .from('doctors')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!doctorRecord || doctorRecord.id !== id) {
+        return res.status(403).json({
+          success: false,
+          data: null,
+          message: 'Acesso negado',
+          error: 'Você só pode atualizar seu próprio perfil'
+        });
+      }
+    } else if (user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        data: null,
+        message: 'Acesso negado',
+        error: 'Permissões insuficientes'
+      });
     }
-    res.json(createResponse(true, null, 'Doctor deleted successfully'));
+
+    const updatedDoctor = await doctorService.updateDoctorProfile(
+      id,
+      req.body,
+      user.id
+    );
+
+    res.json({
+      success: true,
+      data: updatedDoctor,
+      message: 'Perfil do médico atualizado com sucesso'
+    });
   } catch (error) {
-    res.status(500).json(createResponse(false, null, 'Server error', error.message));
+    if (error.message === 'Médico não encontrado') {
+      return res.status(404).json({
+        success: false,
+        data: null,
+        message: error.message,
+        error: error.message
+      });
+    }
+    logger.error('Error in PUT /api/doctors/:id', { error: error.message });
+    next(error);
   }
 });
 
 module.exports = router;
-
- 

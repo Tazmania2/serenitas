@@ -21,6 +21,9 @@ const appointmentsRoutes = require('./routes/appointments');
 const prescriptionsRoutes = require('./routes/prescriptions');
 const examsRoutes = require('./routes/exams');
 const moodEntriesRoutes = require('./routes/mood-entries');
+const doctorNotesRoutes = require('./routes/doctorNotes');
+const lgpdRoutes = require('./routes/lgpd');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -36,7 +39,7 @@ connectDB().then(() => {
   console.log("Database connection has been attempted.");
 });
 
-// Health check endpoint
+// Basic root endpoint
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Serenitas backend is running',
@@ -44,6 +47,65 @@ app.get('/', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// Health check endpoint with database and storage connectivity checks
+app.get('/health', async (req, res) => {
+  const healthCheck = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.APP_VERSION || '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    checks: {
+      database: 'unknown',
+      storage: 'unknown'
+    }
+  };
+
+  try {
+    // Check database connectivity
+    const supabase = require('./config/supabase');
+    const { data, error } = await supabase
+      .from('users')
+      .select('count')
+      .limit(1);
+
+    if (error) {
+      healthCheck.checks.database = 'disconnected';
+      healthCheck.status = 'unhealthy';
+      healthCheck.error = error.message;
+    } else {
+      healthCheck.checks.database = 'connected';
+    }
+
+    // Check Supabase Storage connectivity
+    try {
+      const { data: buckets, error: storageError } = await supabase
+        .storage
+        .listBuckets();
+
+      if (storageError) {
+        healthCheck.checks.storage = 'disconnected';
+        healthCheck.status = 'degraded';
+      } else {
+        healthCheck.checks.storage = 'connected';
+      }
+    } catch (storageErr) {
+      healthCheck.checks.storage = 'disconnected';
+      healthCheck.status = 'degraded';
+    }
+
+    // Return appropriate status code
+    const statusCode = healthCheck.status === 'healthy' ? 200 : 
+                       healthCheck.status === 'degraded' ? 200 : 503;
+
+    res.status(statusCode).json(healthCheck);
+  } catch (error) {
+    healthCheck.status = 'unhealthy';
+    healthCheck.checks.database = 'error';
+    healthCheck.error = error.message;
+    res.status(503).json(healthCheck);
+  }
 });
 
 // API routes
@@ -55,20 +117,18 @@ app.use('/api/appointments', appointmentsRoutes);
 app.use('/api/prescriptions', prescriptionsRoutes);
 app.use('/api/exams', examsRoutes);
 app.use('/api/mood-entries', moodEntriesRoutes);
+app.use('/api/doctor-notes', doctorNotesRoutes);
+app.use('/api/lgpd', lgpdRoutes);
+app.use('/api/admin', adminRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ 
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-  });
-});
+// Import error handlers
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
+// 404 handler (must be before error handler)
+app.use('*', notFoundHandler);
+
+// Global error handling middleware (must be last)
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
