@@ -1,6 +1,6 @@
 const express = require('express');
-const auth = require('../middleware/auth');
-const requireRole = require('../middleware/rbac');
+const { auth } = require('../middleware/auth');
+const { requireRole } = require('../middleware/rbac');
 const doctorService = require('../services/doctorService');
 const logger = require('../utils/logger');
 

@@ -7,6 +7,9 @@
  * Requirements: 1.1
  */
 
+// Load environment variables first
+require('dotenv').config();
+
 const { createClient } = require('@supabase/supabase-js');
 const logger = require('../utils/logger');
 

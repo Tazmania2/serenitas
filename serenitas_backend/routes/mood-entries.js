@@ -9,7 +9,7 @@
 
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const moodService = require('../services/moodService');
 const logger = require('../utils/logger');

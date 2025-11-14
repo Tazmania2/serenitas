@@ -1,17 +1,30 @@
-const mongoose = require('mongoose');
+/**
+ * Database Connection Module
+ * 
+ * Now using Supabase instead of MongoDB
+ * This file is kept for backward compatibility but no longer connects to MongoDB
+ */
+
+const { testConnection } = require('./config/supabase');
+const logger = require('./utils/logger');
 
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/serenitas';
-    console.log('Connecting to MongoDB...');
+    console.log('🔌 Testing Supabase connection...');
     
-    await mongoose.connect(mongoURI);
-    console.log('MongoDB connected successfully');
+    const isConnected = await testConnection();
+    
+    if (isConnected) {
+      console.log('✅ Supabase connected successfully');
+      logger.info('Supabase database connection established');
+    } else {
+      console.log('⚠️  Supabase connection test failed');
+      logger.warn('Supabase connection test failed, but continuing...');
+    }
   } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    console.log('Please make sure MongoDB is running or check your MONGODB_URI in .env file');
-    // Don't exit process, let the app continue without database for now
-    console.log('Continuing without database connection...');
+    console.error('❌ Supabase connection error:', err.message);
+    logger.error('Supabase connection error', { error: err.message });
+    console.log('⚠️  Continuing without database connection...');
   }
 };
 

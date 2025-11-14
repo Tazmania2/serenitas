@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const userService = require('../services/userService');
 const auditService = require('../services/auditService');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const logger = require('../utils/logger');
 

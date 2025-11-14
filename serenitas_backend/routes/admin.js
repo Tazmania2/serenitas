@@ -2,7 +2,7 @@ const express = require('express');
 const { query, body, validationResult } = require('express-validator');
 const adminService = require('../services/adminService');
 const auditService = require('../services/auditService');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const logger = require('../utils/logger');
 

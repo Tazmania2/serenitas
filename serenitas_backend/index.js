@@ -1,10 +1,9 @@
+// Load environment variables FIRST before any other imports
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const connectDB = require('./db');
-
-// Load environment variables
-dotenv.config();
 
 // Set default values for required environment variables
 if (!process.env.JWT_SECRET) {
@@ -64,7 +63,7 @@ app.get('/health', async (req, res) => {
 
   try {
     // Check database connectivity
-    const supabase = require('./config/supabase');
+    const { supabase } = require('./config/supabase');
     const { data, error } = await supabase
       .from('users')
       .select('count')

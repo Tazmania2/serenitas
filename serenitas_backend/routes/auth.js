@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const authService = require('../services/authService');
 const auditService = require('../services/auditService');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const authLimiter = require('../middleware/rateLimit').authLimiter;
 const logger = require('../utils/logger');
 
