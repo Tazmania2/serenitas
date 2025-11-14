@@ -26,8 +26,8 @@ CREATE POLICY "Patients can upload own exam files"
 ON storage.objects FOR INSERT
 WITH CHECK (
   bucket_id = 'exams'
-  AND auth.user_role() = 'patient'
-  AND (storage.foldername(name))[1] = auth.patient_id()::TEXT
+  AND public.get_user_role() = 'patient'
+  AND (storage.foldername(name))[1] = public.get_patient_id()::TEXT
 );
 
 -- Patients can view their own exam files
@@ -35,8 +35,8 @@ CREATE POLICY "Patients can view own exam files"
 ON storage.objects FOR SELECT
 USING (
   bucket_id = 'exams'
-  AND auth.user_role() = 'patient'
-  AND (storage.foldername(name))[1] = auth.patient_id()::TEXT
+  AND public.get_user_role() = 'patient'
+  AND (storage.foldername(name))[1] = public.get_patient_id()::TEXT
 );
 
 -- Patients can delete their own exam files
@@ -44,8 +44,8 @@ CREATE POLICY "Patients can delete own exam files"
 ON storage.objects FOR DELETE
 USING (
   bucket_id = 'exams'
-  AND auth.user_role() = 'patient'
-  AND (storage.foldername(name))[1] = auth.patient_id()::TEXT
+  AND public.get_user_role() = 'patient'
+  AND (storage.foldername(name))[1] = public.get_patient_id()::TEXT
 );
 
 -- Doctors can view exam files for assigned patients
@@ -53,9 +53,9 @@ CREATE POLICY "Doctors can view assigned patient exam files"
 ON storage.objects FOR SELECT
 USING (
   bucket_id = 'exams'
-  AND auth.is_doctor()
+  AND public.is_doctor()
   AND (storage.foldername(name))[1]::UUID IN (
-    SELECT id::TEXT FROM patients WHERE doctor_id = auth.doctor_id()
+    SELECT id::TEXT FROM patients WHERE doctor_id = public.get_doctor_id()
   )
 );
 
@@ -64,7 +64,7 @@ CREATE POLICY "Admins have full access to exam files"
 ON storage.objects FOR ALL
 USING (
   bucket_id = 'exams'
-  AND auth.is_admin()
+  AND public.is_admin()
 );
 
 -- ============================================================================

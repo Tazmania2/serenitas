@@ -93,3 +93,10 @@ node supabase/migration/verify.js
 - Verify bucket exists and is private
 - Check bucket policies allow authenticated uploads
 - Ensure file size and MIME type restrictions are set
+
+### Permission Denied for Schema Auth
+If you get "ERROR: 42501: permission denied for schema auth" when running `04_rls_policies.sql`:
+- ✅ **This is now fixed!** The updated script uses `public` schema instead of `auth` schema
+- Re-download or re-run the updated `04_rls_policies.sql` file
+- The helper functions are now created as `public.get_user_id()`, `public.get_user_role()`, etc.
+- This avoids permission issues while maintaining the same functionality
