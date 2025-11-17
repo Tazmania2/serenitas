@@ -169,15 +169,15 @@ npm run dev
 Use this to track your progress:
 
 ### Supabase Console Verification
-- [ ] Logged into Supabase dashboard
-- [ ] Verified 11 tables exist in Table Editor
-- [ ] Checked RLS policies are enabled
-- [ ] Verified "exams" storage bucket exists
-- [ ] Created test user (optional)
+- [x] Logged into Supabase dashboard
+- [x] Verified 11 tables exist in Table Editor
+- [x] Checked RLS policies are enabled
+- [x] Verified "exams" storage bucket exists
+- [x] Created test user (optional)
 
 ### Backend Verification
-- [ ] Ran `node supabase/test_connection.js` - all green ✅
-- [ ] Started backend with `npm run dev`
+- [x] Ran `node supabase/test_connection.js` - all green ✅
+- [x] Started backend with `npm run dev`
 - [ ] Tested health endpoint: `http://localhost:5000/health`
 - [ ] Tested login with test user (optional)
 
